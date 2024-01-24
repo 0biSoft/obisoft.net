@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace ObisoftNet.Memory
+namespace obisoft.net.memory
 {
     public enum VirtualProtection : uint
     {

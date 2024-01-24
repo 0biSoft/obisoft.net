@@ -8,7 +8,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Web;
 
-namespace ObisoftNet.Http
+namespace obisoft.net.http
 {
 
 
@@ -20,11 +20,19 @@ namespace ObisoftNet.Http
         public bool AllowRedirect { get; set; } = true;
        
 
-        public HttpSession(SecurityProtocolType security = SecurityProtocolType.Tls12)
+        public HttpSession(SecurityProtocolType security = SecurityProtocolType.Tls | SecurityProtocolType.Tls12 | SecurityProtocolType.Ssl3,Dictionary<string,string> cookies=null,string path=null)
         {
+        	
             ServicePointManager.SecurityProtocol = security;
             if (_cookies == null)
                 _cookies = new CookieContainer();
+
+            if (cookies != null && path!=null) {
+               foreach(var item in cookies)
+                {
+                    _cookies.Add(new Cookie(item.Key,item.Value, "/", new Uri(path).Host));
+                }
+            }
         }
         public void SetHeaders(WebRequest request, Dictionary<string, string> headers = null)
         {
@@ -37,6 +45,9 @@ namespace ObisoftNet.Http
         private HttpWebRequest MakeRequestDefault(string url,Dictionary<string,string> headers = null)
         {
             var request = WebRequest.Create(url) as HttpWebRequest;
+            request.ServerCertificateValidationCallback += (e,s,c,r)=>{
+            	return true;
+            };
             request.AllowAutoRedirect = AllowRedirect;
             request.CookieContainer = _cookies;
             if (headers != null)
@@ -45,18 +56,23 @@ namespace ObisoftNet.Http
         }
         
 
-        public WebResponse Get(string url, Dictionary<string, string> headers = null)
+        public WebResponse Get(string url,string json=null, Dictionary<string, string> headers = null)
         {
-            var request = MakeRequestDefault(url,headers:headers);
+            var request = MakeRequestDefault(url,headers:headers) as WebRequest;
             request.Method = "GET";
+            if (json!=null){
+            	request.ContentType = "application/json; charset=utf-8";
+            	
+            	byte[] data = Encoding.UTF8.GetBytes(json);
+            	request.ContentLength = data.Length;
+            	
+            	request.GetRequestStream().Write(data,0,(int)data.Length);
+            }
             return request.GetResponse();
         }
-        public string GetString(string url, Dictionary<string, string> headers = null)
+        public string GetString(string url,string json = null, Dictionary<string, string> headers = null)
         {
-            string result = "";
-            var request = MakeRequestDefault(url, headers: headers);
-            request.Method = "GET";
-            return GetStringFromResponse(request.GetResponse());
+            return GetStringFromResponse(Get(url,json,headers));
         }
 
         public string GetStringFromResponse(WebResponse resp)
@@ -75,11 +91,16 @@ namespace ObisoftNet.Http
             return "";
         }
 
-        public WebResponse Post(string url,object data=null,Dictionary<string,string> headers=null)
+        public WebResponse Post(string url,object data=null,string json=null,Dictionary<string,string> headers=null)
         {
             var request = MakeRequestDefault($"{url}", headers: headers);
             byte[] databytes = new byte[0];
             long datalen = 0;
+            if (json!=null){
+            	request.ContentType = "application/json";
+            	databytes = Encoding.ASCII.GetBytes(json);
+            	datalen = databytes.Length;
+            }
             if (data != null)
             {
                 if (data.GetType() == typeof(Dictionary<string, string>))

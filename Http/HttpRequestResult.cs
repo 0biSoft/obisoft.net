@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace ObisoftNet.Http
+namespace obisoft.net.http
 {
     public class HttpRequestResult
     {

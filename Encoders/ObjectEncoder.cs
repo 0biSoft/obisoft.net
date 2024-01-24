@@ -7,7 +7,7 @@ using System.Runtime.Serialization.Formatters;
 
 using System.IO;
 
-namespace ObisoftNet.Encoders
+namespace obisoft.net.encoders
 {
     public class ObjectEncoder
     {

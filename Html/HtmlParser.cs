@@ -1,115 +1,150 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 
-namespace ObisoftNet.Html
+namespace obisoft.net.html
 {
-    public class HtmlParser
+    public interface IHtmlParser
     {
-        private string regex1 = @"<(?:'[^']*'['']*|'[^']*'['']*|[^''>])+>";
-        private string regex2 = @"<(?:'[^']*'['']*|'[^']*'['']*|[^''>])+>(.*?)<(?:'[^']*'['']*|'[^']*'['']*|[^''>])+>";
-        private string regex3 = @"<([a-zA-Z]+)(?:[^>]*[^/]*)?>";
+        IHtmlDocument Parse(string text);
+    }
+    public class HTMLParser : IHtmlParser
+    {
 
-        private static int SetTagContent(int index,string[] lines,HtmlTag tag)
+        public IEnumerable<IHtmlElement> Children { get; set; }
+
+        public bool HasChildren => throw new NotImplementedException();
+
+        public IEnumerable<HTMLHead> HTMLHead { get; set; }
+        public HTMLBody HTMLBody { get; set; }
+
+        public IHtmlDocument Parse(string text)
         {
-            int endmax = 0;
-            string text = "";
-            for (int i = index + 1; i < lines.Length; i++)
+            if (string.IsNullOrWhiteSpace(text)) throw new ArgumentNullException("text", "Unparseable invalid HTML text provided. Text cannot be null");
+
+            var htmlObject = new HtmlDocument();
+            string pattern = @"<(?<opener>[^>]+)(?:[^>]*)(?:(?<content>.*?)<\/\k<opener>>|\/>)";
+            var matches = Regex.Matches(text, pattern, RegexOptions.Singleline);
+            if (matches.Count == 0) throw new FormatException("Unparseable invalid HTML text provided.");
+
+
+            var html = matches.Cast<Match>().Select(x => x.Groups["content"].Value).FirstOrDefault();
+            html = html.Substring(1); //remove the illegal >
+
+            string openerCloserContentPattern = @"<(?<opener>[^>]+)>(?<content>.*?)<\/\k<opener>>";
+
+            matches = Regex.Matches(html, openerCloserContentPattern, RegexOptions.Singleline);
+            if (matches.Count == 0) throw new FormatException("Unparseable invalid HTML text provided.");
+            //select parent matches...
+            var parentGroupIds = new string[] { "head", "body" };
+            var mainMatches = matches.Cast<Match>().Where(x => parentGroupIds.Contains(x.Groups["opener"].Value)).ToList();
+
+            foreach (Match match in mainMatches)
             {
-                string content = lines[i];
-
-                if (content == "" ||
-                    content == " " ||
-                    content == "  " ||
-                    content == "   ")
-                    continue;
-
-                if (Regex.IsMatch(content, "</(.*?)>"))
+                switch (match.Groups["opener"].Value)
                 {
-                    endmax--;
-                    if (endmax <= 1)
+                    case "head":
+                        var heads = ParseHead(match.Groups["content"].Value);
+                        //HTMLHead = heads;
+                        htmlObject.HTMLHead = heads;
+                        break;
+
+                    case "body":
+                        var content = match.Groups[0].Value;
+                        HTMLBody body = ParseBody(match.Groups["content"].Value);
+                        body.Text = content;
+                        body.Content = match.Groups["content"].Value;
+                        htmlObject.HTMLBody = body;
+                        break;
+                }
+
+            }
+            return htmlObject;
+        }
+
+        private HTMLBody ParseBody(string bodyText)
+        {
+            var body = new HTMLBody();
+            string tagPattern = @"<(?<opener>[^\s>]+)(?:\s+(?<attribute>\w+)\s*=\s*""(?<value>[^""]*)""\s*)*(?:\s*\/?)>(?<content>.*?)<\/\k<opener>>";
+
+            var matches = Regex.Matches(bodyText, tagPattern, RegexOptions.Singleline);
+
+            if (matches.Count == 0) return body;
+
+            foreach (Match match in matches)
+            {
+                var opener = match.Groups["opener"].Value;
+                var content = match.Groups[0].Value;
+
+                var elem = new HtmlElement(match.Groups["content"].Value, content);
+                Group attributeGroup = match.Groups["attribute"];
+                Group valueGroup = match.Groups["value"];
+
+                if (attributeGroup.Success && valueGroup.Success)
+                {
+                    CaptureCollection attributes = attributeGroup.Captures;
+                    CaptureCollection values = valueGroup.Captures;
+
+                    for (int i = 0; i < attributes.Count; i++)
                     {
-                        tag.Text = text;
-                        return i;
+                        string attribute = attributes[i].Value;
+                        string value = values[i].Value;
+
+                        Console.WriteLine($"Attribute: {attribute}, Value: {value}");
+                        elem.Attributes.Add(attribute, value);
                     }
+                }
+                body.Children.Add(elem);
+            }
+            return body;
+
+        }
+        /// <summary>
+        /// Accepts the content of the HTMLHead element...
+        /// </summary>
+        /// <param name="headText"></param>
+        /// <returns></returns>
+        private HTMLHead ParseHead(string headText)
+        {
+            var head = new HTMLHead();
+            string openerCloserContentPattern = @"<(?<opener>[^>]+)(?:[^>]*)(?:(?<content>.*?)<\/\k<opener>>|\/?>)";
+            var matches = Regex.Matches(headText, openerCloserContentPattern, RegexOptions.Singleline);
+
+            if (matches.Count == 0) return head;
+
+            foreach (Match match in matches)
+            {
+                var opener = match.Groups["opener"].Value;
+                var content = match.Groups[0].Value;
+
+                //get attrs
+                string attributePattern = @"(?<attribute>\w+)\s*=\s*""(?<value>[^""]*)""";
+                var attributes = Regex.Matches(content, attributePattern, RegexOptions.Singleline).Cast<Match>().ToDictionary(x => x.Groups["attribute"].Value, x => x.Groups["value"].Value);
+
+
+                if (match.Groups["opener"].Value.ToLowerInvariant().StartsWith("meta"))
+                {
+                    head.Metas.Add(new HtmlElement(match.Groups["content"].Value, content, attributes));
+
+                }
+                else if (match.Groups["opener"].Value.ToLowerInvariant().StartsWith("link"))
+                {
+                    head.LinkHrefs.ToList().Add(new HtmlElement(match.Groups["content"].Value, content, attributes));
                 }
                 else
-                if (Regex.IsMatch(content, "<br />") || Regex.IsMatch(content, "<br/>"))
                 {
-                    
-                }else
-                if (Regex.IsMatch(content, "<(.*?)+>"))
-                {
-                    Match parse = Regex.Match(content, "<(.*?)+>");
-                    string line = parse.Value;
+                    //it's a title...
+                    if (!string.IsNullOrWhiteSpace(head?.Title?.Content)) throw new FormatException("Unparseable invalid HTML document. THere can only be one Title per HTMLDocument");
+                    head.Title = new HtmlElement(match.Groups["content"].Value, content, attributes);
 
-                    string[] tokens = line.Split(' ');
-                    string tagname = "";
-
-                    tagname = tokens[0].Substring(1).Replace(">","");
-
-                    HtmlTag newtag = new HtmlTag(tagname);
-                    newtag.Tags = new List<HtmlTag>();
-                    newtag.Text = "";
-                    newtag.Attribs = new Dictionary<string, string>();
-
-                    if (tokens.Length>0)
-                    for(int itag = 1; itag < tokens.Length; itag++)
-                    {
-                        try
-                        {
-                            string[] attrsplit = tokens[itag].Split('=');
-                            string key = attrsplit[0];
-                            string val = "";
-                            if (attrsplit.Length > 2)
-                            {
-                                    for (var item = 1; item < attrsplit.Length; item++)
-                                        val += attrsplit[item] + "=";
-                                    val = val.Remove(val.Length - 1);
-                            }
-                            else val = attrsplit[1];
-                            newtag.Attribs.Add(key, val);
-                        }
-                        catch { }
-                    }
-
-                    if (Regex.IsMatch(parse.Value, "(.*?)/>"))
-                    {
-                        tag.Text = text;
-                        tag.Tags.Add(newtag); 
-                        endmax--;
-                        continue;
-                    }
-
-                    var ii = SetTagContent(i, lines, newtag);
-                    if (tag.Tags == null)
-                        tag.Tags = new List<HtmlTag>();
-                    tag.Tags.Add(newtag);
-                    if(ii==i)
-                        endmax++;
-                    i = ii;
-                    continue;
                 }
-                text += content;
             }
-            tag.Text = text;
-            return index;
+            return head;
+
         }
 
-        public static HtmlTag Parse(string html)
-        {
-            string[] lines = html.Replace("\"", "'").
-                Replace("='", "=").Replace("' ", " ").Replace("'>", " >").
-                Replace(">", ">\n").Replace("</", "\n</").
-                Split('\n');
-            HtmlTag root = new HtmlTag("root");
-            if(lines.Length>1)
-            SetTagContent(0, lines, root);
-            return root.Find("html");
-        }
 
     }
 }
+

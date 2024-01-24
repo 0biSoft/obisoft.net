@@ -9,7 +9,7 @@ using System.Web;
 using System.Text.RegularExpressions;
 
 
-namespace ObisoftNet.Http
+namespace obisoft.net.http
 {
     public class RouteResult
     {

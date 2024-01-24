@@ -2,22 +2,25 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Net.Security;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace ObisoftNet.Http
+namespace obisoft.net.http
 {
 
-    public delegate void HttpServerHandle(HttpListenerRequest request,HttpListenerResponse response, RouteResult result);
+    public delegate void HttpServerHandle(HttpListenerRequest request, HttpListenerResponse response, RouteResult result);
 
     public class HttpServer : IDisposable
     {
         private HttpListener _server;
         private HttpServerHandle _handle;
+        public bool _runing = true;
 
         public string Host { get; private set; } = "";
-        public HttpServer(HttpServerHandle handle=null)
+        public HttpServer(HttpServerHandle handle = null)
         {
             _server = new HttpListener();
             _handle = handle;
@@ -25,60 +28,126 @@ namespace ObisoftNet.Http
 
         public void Run(int port = 80)
         {
+            ServicePointManager.DefaultConnectionLimit = 100;
             Host = $"http://127.0.0.1:{port}/";
+            if (port == 443)
+            {
+                Host = Host.Replace("http://", "https://");
+            }
             _server.Prefixes.Add(Host);
-            if(port==80)
+            if (port == 80)
                 Host = $"http://127.0.0.1";
+            if (port == 443)
+                Host = $"https://127.0.0.1";
             _server.Start();
-            _server.BeginGetContext(HandleContext,null);
+            _server.BeginGetContext(HandleContext, null);
+        }
+        public static bool ValidateCertificate(
+        object sender,
+        X509Certificate certificate,
+        X509Chain chain,
+        SslPolicyErrors sslPolicyErrors)
+        {
+            if (sslPolicyErrors == SslPolicyErrors.None)
+                return true;
+
+            Console.WriteLine("Certificate error: " + sslPolicyErrors);
+            return false;
+        }
+        public void RunHttps(int port = 80)
+        {
+            ServicePointManager.DefaultConnectionLimit = 100;
+            ServicePointManager.ServerCertificateValidationCallback += ValidateCertificate;
+            Host = $"https://127.0.0.1:{port}/";
+            if (port == 443)
+            {
+                Host = Host.Replace("http://", "https://");
+            }
+            _server.Prefixes.Add(Host);
+            if (port == 80)
+                Host = $"https://127.0.0.1";
+            if (port == 443)
+                Host = $"https://127.0.0.1";
+            _server.Start();
+            _server.BeginGetContext(HandleContext, null);
         }
 
-        
-        private Dictionary<string,HttpServerHandle> routes = new Dictionary<string, HttpServerHandle>();
+
+        private Dictionary<string, HttpServerHandle> routes = new Dictionary<string, HttpServerHandle>();
         public void Route(string path, HttpServerHandle handleroute)
         {
             if (path == "/")
                 _handle = handleroute;
-            routes.Add(path,handleroute);
+            routes.Add(path, handleroute);
         }
 
         private List<Thread> threads = new List<Thread>();
         private void HandleContext(IAsyncResult ar)
         {
-            var context = _server.EndGetContext(ar);
-            if (_handle != null)
+            try
             {
-                Thread t = new Thread(()=> {
-                    bool next = false;
-                    foreach (var route in routes)
-                    {
-                        if (context.Request.Url.AbsolutePath == route.Key)
+                var context = _server.EndGetContext(ar);
+                if (_handle != null)
+                {
+                    Thread t = new Thread(() => {
+                        try
                         {
-                            var routeresult = RouteResult.ResultFrom(context.Request);
-                            route.Value(context.Request, context.Response, routeresult);
-                            next = true;
-                            break;
+                            bool next = false;
+                            foreach (var route in routes)
+                            {
+                                if (context.Request.Url.AbsolutePath == route.Key)
+                                {
+                                    var routeresult = RouteResult.ResultFrom(context.Request);
+                                    route.Value(context.Request, context.Response, routeresult);
+                                    next = true;
+                                    break;
+                                }
+                            }
+                            if (_handle != null && !next)
+                            {
+                                var routeresult = RouteResult.ResultFrom(context.Request);
+                                _handle(context.Request, context.Response, routeresult);
+                            }
                         }
-                    }
-                    if(_handle!=null && !next)
-                    {
-                        var routeresult = RouteResult.ResultFrom(context.Request);
-                        _handle(context.Request, context.Response, routeresult);
-                    }
-                        
-                    context.Response.Close();
-                });
-                threads.Add(t);
-                t.Start();
+                        catch
+                        {
+
+                        }
+
+                        try
+                        {
+                                context.Response?.Close();
+                        }
+                        catch (Exception e)
+                        {
+                        }
+                    });
+                    threads.Add(t);
+                    t.Start();
+                }
             }
+            catch 
+            {
+            }
+
+            if (_runing)
             _server.BeginGetContext(HandleContext, null);
         }
 
         public void Dispose()
         {
-            foreach (var t in threads)
-                t?.Abort();
-            threads?.Clear();
+            try
+            {
+                foreach (var t in threads)
+                    t?.Abort();
+                threads?.Clear();
+                _server?.Abort();
+                _runing = false;
+            }
+            catch
+            {
+                
+            }
         }
     }
 }

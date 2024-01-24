@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Reflection;
 
-namespace ObisoftNet.Encoders
+namespace obisoft.net.encoders
 {
     public class S6Encoder
     {

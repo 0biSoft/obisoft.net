@@ -1,0 +1,5 @@
+C:\Users\ObisoftDev\Downloads\Compressed\obisoft.net-main\obisoft.net-main\bin\Debug\obisoft.net.dll.config
+C:\Users\ObisoftDev\Downloads\Compressed\obisoft.net-main\obisoft.net-main\bin\Debug\obisoft.net.dll
+C:\Users\ObisoftDev\Downloads\Compressed\obisoft.net-main\obisoft.net-main\bin\Debug\obisoft.net.pdb
+C:\Users\ObisoftDev\Downloads\Compressed\obisoft.net-main\obisoft.net-main\obj\Debug\obisoft.net.dll
+C:\Users\ObisoftDev\Downloads\Compressed\obisoft.net-main\obisoft.net-main\obj\Debug\obisoft.net.pdb

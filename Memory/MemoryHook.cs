@@ -17,7 +17,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace ObisoftNet.Memory
+namespace obisoft.net.memory
 {
     public unsafe class MemoryHook
     {
