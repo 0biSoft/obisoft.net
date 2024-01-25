@@ -63,6 +63,10 @@
     <Compile Include="Memory\VirtualProtection.cs" />
     <Compile Include="Html\HtmlTag.cs" />
     <Compile Include="Html\HtmlParser.cs" />
+    <Compile Include="Packer\Compresion.cs" />
+    <Compile Include="Packer\Delegates.cs" />
+    <Compile Include="Packer\PacketFile.cs" />
+    <Compile Include="Packer\PacketFolder.cs" />
     <Compile Include="Utils.cs" />
   </ItemGroup>
   <ItemGroup>
