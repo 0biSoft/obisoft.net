@@ -135,7 +135,7 @@ namespace obisoft.net.html
                 else
                 {
                     //it's a title...
-                    if (!string.IsNullOrWhiteSpace(head?.Title?.Content)) throw new FormatException("Unparseable invalid HTML document. THere can only be one Title per HTMLDocument");
+                    if (!string.IsNullOrWhiteSpace(head?.Title?.Content)) 
                     head.Title = new HtmlElement(match.Groups["content"].Value, content, attributes);
 
                 }
